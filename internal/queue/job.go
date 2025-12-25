@@ -16,10 +16,10 @@ const (
 )
 
 type Job struct {
-	ID        string
-	Payload   []byte
-	State     JobState
-	CreatedAt time.Time
+	ID        string    `json:"id"`
+	Payload   []byte    `json:"payload"`
+	State     JobState  `json:"state"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func newJob(payload []byte) Job {
