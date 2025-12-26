@@ -1,5 +1,11 @@
 package config
 
+import (
+	"os"
+
+	"github.com/joho/godotenv"
+)
+
 type Config struct {
 	ServerAddress  string
 	ProducerApiKey string
@@ -7,9 +13,13 @@ type Config struct {
 }
 
 func Load() Config {
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic(err)
+	}
 	return Config{
-		ServerAddress:  ":8080",
-		ProducerApiKey: "producer-123",
-		ConsumerApiKey: "consumer-123",
+		ServerAddress:  os.Getenv("SERVER_ADDRESS"),
+		ProducerApiKey: os.Getenv("PRODUCER_API_KEY"),
+		ConsumerApiKey: os.Getenv("CONSUMER_API_KEY"),
 	}
 }
