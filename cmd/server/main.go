@@ -12,6 +12,6 @@ func main() {
 	fmt.Println("Dispatch running...")
 	cfg := config.Load()
 	qm := queue.NewManager()
-	server := http.NewServer(cfg.ServerAddress, qm)
+	server := http.NewServer(cfg, qm)
 	server.Start()
 }
