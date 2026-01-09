@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/kaviraj-j/dispatch/internal/auth"
@@ -16,6 +17,13 @@ func NewMiddleware(auth *auth.Auth) *Middleware {
 	}
 }
 
+type contextKey string
+
+const (
+	consumerIDKey contextKey = "consumerID"
+	producerIDKey contextKey = "producerID"
+)
+
 func (m *Middleware) IsProducerAuthenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -30,6 +38,8 @@ func (m *Middleware) IsProducerAuthenticated(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+		ctx := context.WithValue(r.Context(), producerIDKey, apiKey)
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -48,6 +58,18 @@ func (m *Middleware) IsConsumerAuthenticated(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
+		ctx := context.WithValue(r.Context(), consumerIDKey, apiKey)
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func ConsumerIDFromContext(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(consumerIDKey).(string)
+	return id, ok
+}
+
+func ProducerIDFromContext(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(producerIDKey).(string)
+	return id, ok
 }

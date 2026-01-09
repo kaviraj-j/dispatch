@@ -9,9 +9,9 @@ import (
 )
 
 func main() {
-	fmt.Println("Dispatch running...")
 	cfg := config.Load()
 	qm := queue.NewManager()
 	server := http.NewServer(cfg, qm)
 	server.Start()
+	fmt.Println("Dispatch running...")
 }

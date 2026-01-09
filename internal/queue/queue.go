@@ -3,13 +3,24 @@ package queue
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
 type Queue struct {
 	name       string
 	mu         sync.Mutex
 	jobs       []Job
-	inProgress map[string]Job
+	inProgress map[string]JobInProgress
+}
+
+type JobInProgress struct {
+	job      Job
+	jobTimer *time.Timer
+}
+
+type TimeoutPayload struct {
+	queueName string
+	jobID     string
 }
 
 // Errors
@@ -21,7 +32,7 @@ func NewQueue(name string) *Queue {
 	return &Queue{
 		name:       name,
 		jobs:       make([]Job, 0),
-		inProgress: make(map[string]Job),
+		inProgress: make(map[string]JobInProgress),
 	}
 }
 
@@ -45,7 +56,11 @@ func (q *Queue) Dequeue() (*Job, bool) {
 	}
 	job := q.jobs[0]
 	q.jobs = q.jobs[1:]
-	q.inProgress[job.ID] = job
+	jobTimer := time.AfterFunc(5*time.Second, q.JobTimeoutHanlder(job.ID))
+	q.inProgress[job.ID] = JobInProgress{
+		job:      job,
+		jobTimer: jobTimer,
+	}
 	return &job, true
 }
 
@@ -53,10 +68,11 @@ func (q *Queue) Ack(jobID string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if _, ok := q.inProgress[jobID]; !ok {
+	jobInProgress, ok := q.inProgress[jobID]
+	if !ok {
 		return false
 	}
-
+	jobInProgress.jobTimer.Stop()
 	delete(q.inProgress, jobID)
 	return true
 }
@@ -75,4 +91,18 @@ func (q *Queue) InProgressSize() int {
 	defer q.mu.Unlock()
 
 	return len(q.inProgress)
+}
+
+func (q *Queue) JobTimeoutHanlder(jobID string) func() {
+	return func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+
+		jobInProgress, ok := q.inProgress[jobID]
+		if !ok {
+			return
+		}
+		delete(q.inProgress, jobID)
+		q.jobs = append(q.jobs, jobInProgress.job)
+	}
 }
