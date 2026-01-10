@@ -10,6 +10,7 @@ type Queue struct {
 	name       string
 	mu         sync.Mutex
 	jobs       []Job
+	deadLetter []Job
 	inProgress map[string]JobInProgress
 }
 
@@ -56,7 +57,8 @@ func (q *Queue) Dequeue() (*Job, bool) {
 	}
 	job := q.jobs[0]
 	q.jobs = q.jobs[1:]
-	jobTimer := time.AfterFunc(5*time.Second, q.JobTimeoutHanlder(job.ID))
+	jobTimer := time.AfterFunc(2*time.Second, q.JobTimeoutHanlder(job.ID))
+	job.Attempts++
 	q.inProgress[job.ID] = JobInProgress{
 		job:      job,
 		jobTimer: jobTimer,
@@ -74,6 +76,21 @@ func (q *Queue) Ack(jobID string) bool {
 	}
 	jobInProgress.jobTimer.Stop()
 	delete(q.inProgress, jobID)
+	return true
+}
+
+func (q *Queue) FailJob(jobID string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	jobInProgress, ok := q.inProgress[jobID]
+	if !ok {
+		return false
+	}
+	if jobInProgress.job.Attempts >= jobInProgress.job.MaxAttempts {
+		return true
+	}
+	q.jobs = append(q.jobs, jobInProgress.job)
 	return true
 }
 
@@ -103,6 +120,15 @@ func (q *Queue) JobTimeoutHanlder(jobID string) func() {
 			return
 		}
 		delete(q.inProgress, jobID)
+		if jobInProgress.job.Attempts >= jobInProgress.job.MaxAttempts {
+			// send to dead letter queue
+			q.deadLetter = append(q.deadLetter, jobInProgress.job)
+			return
+		}
 		q.jobs = append(q.jobs, jobInProgress.job)
 	}
+}
+
+func (q *Queue) GetDeadLetterJobs() []Job {
+	return q.deadLetter
 }

@@ -63,6 +63,13 @@ func (s *Server) registerRoutes() {
 			nethttp.HandlerFunc(jobHandler.HandleAck),
 		),
 	)
+
+	s.mux.Handle(
+		"/deadletter",
+		s.middleware.IsConsumerAuthenticated(
+			nethttp.HandlerFunc(jobHandler.HandleDeadLetterQueue),
+		),
+	)
 }
 
 func (s *Server) Start() error {
